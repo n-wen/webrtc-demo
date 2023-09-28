@@ -1,0 +1,35 @@
+<html>
+
+<head>
+
+	
+</head>
+
+<body>
+	<div>
+		Tel. : <input id="phone" disabled />
+	</div>
+
+	<div>
+		connect: <input id="callnumber" />
+		<button id="connectbtn" onclick="connect();">connect</button>
+	</div>
+	<div>
+		message: <input id="message" />
+		<button id="textbtn" onclick="sendmessage();" disabled>send</button>
+	</div>
+
+	<div>
+		<video width="100" id="remoteVideo" autoplay playsinline controls="false"  />
+	</div>
+
+	<div>
+		<video width="100" id="localVideo" autoplay playsinline controls="false"  hidden/>
+	</div>
+
+	<script src="script.js"></script>
+	<script>init();</script>
+
+</body>
+
+</html>
