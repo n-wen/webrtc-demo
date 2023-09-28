@@ -1,4 +1,4 @@
-package webrtcService
+package webrtcsvc
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 )
 
 type User struct {
@@ -25,19 +25,10 @@ var peerConnectionConfig = webrtc.Configuration{
 }
 
 func NewUser(c *websocket.Conn) *User {
-	mediaEngine := webrtc.MediaEngine{}
-	mediaEngine.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000))
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
-	peerConnection, err := api.NewPeerConnection(peerConnectionConfig)
-	if err != nil {
-		log.Print("NewPeerConnection:", err)
-		return nil
-	}
 	return &User{
 		id:    uuid.New().String(),
 		conn:  c,
 		phone: "",
-		pc:    peerConnection,
 	}
 }
 

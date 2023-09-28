@@ -1,6 +1,6 @@
-package webrtcService
+package webrtcsvc
 
-import "github.com/pion/webrtc/v2"
+import "github.com/pion/webrtc/v3"
 
 type Message struct {
 	Kind   string                     `json:"kind"` // setPhone, offer, answer, callto, callin

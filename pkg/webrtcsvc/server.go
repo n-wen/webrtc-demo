@@ -1,4 +1,4 @@
-package webrtcService
+package webrtcsvc
 
 import (
 	"log"

@@ -1,7 +1,7 @@
 package main
 
-import webrtcService "webrtc-demo/pkg/webrtc"
+import  "webrtc-demo/pkg/webrtcsvc"
 
 func main() {
-	webrtcService.Serve()
+	webrtcsvc.Serve()
 }
