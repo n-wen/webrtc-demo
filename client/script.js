@@ -1,38 +1,53 @@
+"use strict";
 
-var conn;
+var conn; // websocket connection
 var peerConnection;
-var phone;
-var dataChannel;
-var targetnumber;
+var phoneNumber; // 手机号, 用于标识一个客户端
+var dataChannel; // 数据channel, 可以用于发送文本消息
+var targetnumber; // 目标号码
+var textChanName = 'chat';
 var localICEServer = {
-	urls: 'turn:172.29.0.156:3478',
+	urls: 'turn:127.0.0.1:3478',
 	username: 'test',
 	credential: 'test'
-}
+} // ICEServer
+var signalingURL = "ws://localhost:9999/signaling"; // signaling 服务地址
+
+// DOMs
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
+const phoneDOM = document.getElementById("phone");
+const textbtn = document.getElementById("textbtn");
+const targetDOM = document.getElementById("callnumber");
+const connectbtn = document.getElementById("connectbtn");
+const messageDOM = document.getElementById("message");
+
 var localStream;
 
 
 function init() {
-	phone = prompt("Please enter your phonenumber", "");
-	document.getElementById("phone").value = phone;
+	phoneNumber = prompt("Please enter your phonenumber", "");
+	phoneDOM.value = phoneNumber;
+
+	// 获取摄像头
 	navigator.mediaDevices.getUserMedia({ 'video': true, 'audio': true }).then(stream => {
 		localStream = stream;
 		localVideo.srcObject = stream;
 	});
-		// establish websocket
-		conn = new WebSocket('ws://localhost:9999/signaling');
+
+	// establish websocket
+	conn = new WebSocket(signalingURL);
 	conn.addEventListener('open', () => {
 		console.log('opened');
 		conn.send(JSON.stringify({
 			'kind': 'setPhone',
-			'phone': phone,
+			'phone': phoneNumber,
 		}));
 	});
 	conn.addEventListener('close', () => {
 		console.log('closed');
 	});
+	// websocket事件监听
 	conn.addEventListener('message', eventhandler);
 }
 
@@ -43,40 +58,16 @@ function eventhandler(event) {
 	console.log('kind: ', data['kind']);
 	// offer
 	switch (data['kind']) {
-		case 'offer':
+		case 'offer': // 收到offer
 			handleOffer(data['offer'], data['from']);
 			break;
-		case 'answer':
+		case 'answer': // 收到answer
 			handleAnswer(data['answer'], data['from']);
 			break;
-		case 'callstart':
-			handleCallstart();
-			break;
-	}
-
-}
-
-
-function handleAnswerCandidate(event) {
-	if (event.candidate == null) {
-		answer = peerConnection.localDescription
-		console.log("answer: ", JSON.stringify(answer));
-		conn.send(JSON.stringify({
-			'kind': 'answer',
-			'answer': answer,
-			'from': phone,
-			'to': document.getElementById("callnumber").value,
-		}))
 	}
 }
 
-// datachannel event
-function handledatachannel(event) {
-	console.log('handledatachannel');
-	dataChannel = event.channel;
-	dataChannel.onopen = datachannelopen;
-	dataChannel.onmessage = datachannelmessage;
-}
+
 
 
 // 处理offer
@@ -84,11 +75,35 @@ function handleOffer(data, from) {
 	if (data == null) {
 		return
 	}
-	document.getElementById("callnumber").value = from;
-	document.getElementById("callnumber").disabled = true;
-	document.getElementById("connectbtn").disabled = true;
-	peerConnection = createPeerConnection(handleAnswerCandidate);
-	peerConnection.ondatachannel = handledatachannel;
+	targetDOM.value = from; // 显示发送offer的号码
+	targetDOM.disabled = true;
+	connectbtn.disabled = true;
+
+	// 创建连接
+	peerConnection = createPeerConnection();
+	peerConnection.onicecandidate = event => {
+		if (event.candidate == null) { // This will be the empty string if the event indicates that there are no further candidates to come in this generation, or null if all ICE gathering on all transports is complete.
+			let answer = peerConnection.localDescription
+			console.log("answer: ", JSON.stringify(answer));
+			conn.send(JSON.stringify({
+				'kind': 'answer',
+				'answer': answer,
+				'from': phoneNumber,
+				'to': targetDOM.value,
+			}))
+		} else { // send the candidate to remote peer
+
+		}
+	};
+
+	// datachannel配置
+	peerConnection.ondatachannel = event => {
+		let chan = event.channel;
+		if (chan.label === textChanName) {
+			setupDatachannel(chan);
+		}
+	};
+
 	peerConnection.onaddstream = stream => {
 		console.log("add stream: ", stream);
 	};
@@ -102,6 +117,7 @@ function handleOffer(data, from) {
 	})
 }
 
+// 处理对方收到offer的answer
 function handleAnswer(data) {
 	if (data == null) {
 		return
@@ -115,59 +131,57 @@ function handleAnswer(data) {
 }
 
 
-function createPeerConnection(candidatehandler) {
-	configuration = {
+function createPeerConnection() {
+	let configuration = {
 		iceServers: [localICEServer]
 	};
 	peerConnection = new RTCPeerConnection(configuration);
-	peerConnection.onicecandidate = candidatehandler;
 	peerConnection.ontrack = e => remoteVideo.srcObject = e.streams[0];
 	localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 	return peerConnection;
 }
 
-function datachannelopen() {
-	console.log('datachannelopen');
-	document.getElementById("textbtn").disabled = false;
-}
-
-function datachannelmessage(message) {
-	console.log('datachannelmessage: ', message);
-	alert("recv text: " + message.data);
-}
-
-function handleOfferCandidate(event) {
-	console.log("candidate: ", event);
-	if (event.candidate != null) {
-		offer = peerConnection.localDescription;
-		console.log("offer: ", offer);
-		conn.send(JSON.stringify({
-			'kind': 'offer',
-			'from': phone,
-			'to': targetnumber,
-			'offer': offer
-		}))
-	}
+function setupDatachannel(chan) {
+	chan.onopen = () => textbtn.disabled = false;
+	chan.onmessage = message => {
+		alert("recv text: " + message.data);
+	};
 }
 
 
+// 发起连接, 连接turn , 发送offer
 function connect() {
-	targetnumber = document.getElementById("callnumber").value;
+	targetnumber = targetDOM.value;
 	console.log("target :", targetnumber);
-	peerConnection = createPeerConnection(handleOfferCandidate);
-	dataChannel = peerConnection.createDataChannel('chat');
-	dataChannel.onopen = datachannelopen;
-	dataChannel.onmessage = datachannelmessage;
+	peerConnection = createPeerConnection();
+	dataChannel = peerConnection.createDataChannel(textChanName);
+	setupDatachannel(dataChannel);
+
+	// todo send candidates
+	peerConnection.onicecandidate = event => {
+		console.log("candidate: ", event);
+	};
 
 	peerConnection.createOffer().then(offer => {
 		peerConnection.setLocalDescription(offer);
 		console.log("create offer done.")
-		document.getElementById("connectbtn").disabled = true;
+		connectbtn.disabled = true;
+
+		conn.send(JSON.stringify({
+			'kind': 'offer',
+			'from': phoneNumber,
+			'to': targetnumber,
+			'offer': offer
+		}))
+
+		console.log("send offer done.")
+	}).catch(error => {
+		console.log("create offer error: ", error);
 	})
 }
 
-
+// 发送文本消息
 function sendmessage() {
-	text = document.getElementById("message").value;
-	dataChannel.send(text);
+	dataChannel.send(messageDOM.value);
+	messageDOM.value = "";
 }
