@@ -76,9 +76,9 @@ func (u *User) HandleMsg() {
 			if target, ok := phoneMap[*message.To]; ok && target != nil {
 				target.SendMessage(Message{Kind: "answer", Answer: message.Answer, From: message.From, To: message.To})
 			}
-		case "callstart":
+		case "candidate":
 			if target, ok := phoneMap[*message.To]; ok && target != nil {
-				target.SendMessage(Message{Kind: "callstart", From: message.From, To: message.To})
+				target.SendMessage(Message{Kind: "candidate", From: message.From, To: message.To, Candidate: message.Candidate})
 			}
 		}
 	}

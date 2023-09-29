@@ -64,6 +64,9 @@ function eventhandler(event) {
 		case 'answer': // 收到answer
 			handleAnswer(data['answer'], data['from']);
 			break;
+		case 'candidate': // 收到candidate
+			handleCandidate(data['candidate'])
+			break;
 	}
 }
 
@@ -130,6 +133,15 @@ function handleAnswer(data) {
 	});
 }
 
+function handleCandidate(data) {
+	if (!peerConnection) return;
+	if (!data) {
+		peerConnection.addIceCandidate(null);
+	} else {
+		peerConnection.addIceCandidate(data);
+	}
+}
+
 
 function createPeerConnection() {
 	let configuration = {
@@ -157,9 +169,15 @@ function connect() {
 	dataChannel = peerConnection.createDataChannel(textChanName);
 	setupDatachannel(dataChannel);
 
-	// todo send candidates
+	// send candidates
 	peerConnection.onicecandidate = event => {
 		console.log("candidate: ", event);
+		conn.send(JSON.stringify({
+			'kind': 'candidate',
+			'candidate': event.candidate,
+			'from': phoneNumber,
+			'to': targetnumber,
+		}));
 	};
 
 	peerConnection.createOffer().then(offer => {
